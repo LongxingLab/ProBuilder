@@ -1,0 +1,354 @@
+#ifndef INCLUDED_scoring_ScoreFunction_hh
+#define INCLUDED_scoring_ScoreFunction_hh
+
+#include "basic/types.hh"
+#include "scene/Pose.hh"
+#include "scene/Conformation.hh"
+#include "scene/Residue.hh"
+#include "scoring/Energy.hh"
+#include "basic/VoxelArray.hh"
+#include "utils/utils.hh"
+#include "utils/string_util.hh"
+#include <parallel_hashmap/phmap_dump.h>
+#include <iostream>
+#include <set>
+
+namespace scoring {
+using namespace basic;
+using namespace scene;
+class BaseScoreMethod{
+    public:
+
+    BaseScoreMethod():_weight(1.0),_energy_type(ENERGY_TYPE_UNDEFINED) {};
+    virtual Real score(scene::Pose & pose) const=0;
+    Real weighted_score(scene::Pose & pose) const{
+        return score(pose)*_weight;
+    };
+    void set_weight(Real weight){_weight=weight;};
+    void set_energy_type(ENERGY_TYPE energy_type){_energy_type=energy_type;};
+    void set_score_type(SCORE_TYPE score_type){_score_type = score_type;};
+    void set_designable_res(const std::string & designable_res_str);
+    protected:
+
+    Real _weight;
+    ENERGY_TYPE _energy_type;
+    SCORE_TYPE _score_type;
+
+    std::set<Size> _designable_res;
+};
+
+class RifScoreMethod:public BaseScoreMethod{
+    public:
+
+    RifScoreMethod(std::string rif_table_path,Real cart_resl=1.0,Real angle_resl=16.0);
+    virtual Real score(scene::Pose & pose) const override;
+    Real score_with_anchor_seqpos(scene::Pose & pose, std::vector<Size> & anchor_seqpos, bool return_seqpos=true) const;
+    void unserialize_phmap(std::string fname);
+    void set_relative_pos(EigenXform const & xform);
+    protected:
+
+    std::string _rif_table_path;
+    hash_table<uint64_t, Real> _rif_table;
+    wefoldHasher _hasher; 
+    EigenXform _relative_xform;
+    bool _is_relative_xform_set;
+
+
+};
+
+class RpxScoreMethod:public BaseScoreMethod{
+    public:
+
+    RpxScoreMethod(std::string rpx_table_path,Real cart_resl=1.0,Real angle_resl=16.0,bool use_ss=true,bool include_target=true);
+    ~RpxScoreMethod();
+    virtual Real score(scene::Pose & pose) const override{return base_score(pose);};
+    Real base_score(scene::Pose & pose,Size start_chain=1,Size end_chain=-1) const;
+    Real score_rpx_pair(EigenXform const & stub1, EigenXform const & stub2, char ss1, char ss2) const;
+    void unserialize_phmap(std::string const & fname);
+    void only_count_two_repeat(bool option=true){_only_count_two_repeat=option;}
+    protected:
+
+    std::string _rpx_table_path;
+    hash_table<uint64_t, Real> _rpx_table;
+    wefoldHasher _hasher; 
+    Size _min_sequence_separation;
+    Real _squared_dist_cutoff;
+    bool _use_ss;
+    bool _only_count_two_repeat = false;
+    bool _include_target;
+
+};
+
+class RpxScoreInterfaceMethod:public RpxScoreMethod{
+    public:
+        //
+        RpxScoreInterfaceMethod(Size first_chain_len, std::string rpx_table_path,Real cart_resl=1.0,Real angle_resl=16.0,bool use_ss=true):RpxScoreMethod(rpx_table_path,cart_resl,angle_resl,use_ss), _first_chain_len(first_chain_len){};
+
+        virtual Real score(scene::Pose & pose) const;
+    private:
+        //
+        Size _first_chain_len;
+
+};
+
+// this class is for rpx betwwen target pose and origin pose
+class RpxScoreTargetMethod:public RpxScoreMethod{
+    public:
+
+    RpxScoreTargetMethod(std::string rpx_table_path,Real cart_resl=1.0,Real angle_resl=16.0,bool use_ss=true):RpxScoreMethod(rpx_table_path,cart_resl,angle_resl,use_ss){};
+
+    virtual Real score(scene::Pose & pose) const;
+
+    private:
+    // use this for some score that has no energy cache
+    
+};
+
+class DisulfideScoreMethod:public BaseScoreMethod{
+    public:
+
+    DisulfideScoreMethod(std::string disulfide_hash_table_path, Size disulfide_min_sequence_separation=8, Real cart_resl=1.0,Real angle_resl=16.0);
+    ~DisulfideScoreMethod();
+    virtual Real score(scene::Pose & pose) const override{return base_score(pose);};
+    Real base_score(scene::Pose & pose,Size start_chain=1,Size end_chain=-1) const;
+    bool check_disulfide_exist(EigenXform const & stub1, EigenXform const & stub2) const;
+    void unserialize_phmap(std::string const & fname);
+
+    void set_scnb_burial_cutoff(Real cutoff) {_scnb_burial_cutoff = cutoff;};
+
+    protected:
+
+    std::string _disulfide_hash_table_path;
+    hash_set_table<uint64_t, int32_t> _hash_table;
+    wefoldHasher _hasher; 
+    Size _min_sequence_separation;
+    Real _squared_dist_cutoff;
+    Real _scnb_burial_cutoff;
+
+};
+
+class PrivilegedPairScoreMethod:public BaseScoreMethod{
+    public:
+
+    PrivilegedPairScoreMethod(std::string hash_table_path, Size min_sequence_separation=8, Real cart_resl=1.0,Real angle_resl=16.0);
+    ~PrivilegedPairScoreMethod();
+    virtual Real score(scene::Pose & pose) const override{return base_score(pose);};
+    Real base_score(scene::Pose & pose,Size start_chain=1,Size end_chain=-1) const;
+    bool check_pair_exist(EigenXform const & stub1, EigenXform const & stub2) const;
+    void unserialize_phmap(std::string const & fname);
+
+    void set_scnb_burial_cutoff(Real cutoff) {_scnb_burial_cutoff = cutoff;};
+
+    protected:
+
+    std::string _hash_table_path;
+    hash_set_table<uint64_t, uint8_t> _hash_table;
+    wefoldHasher _hasher; 
+    Size _min_sequence_separation;
+    Real _squared_dist_cutoff;
+    Real _scnb_burial_cutoff;
+    bool _ignore_twin_pair;
+
+};
+
+// metal coordination score is a zero (whole) body energy
+
+class MetalCoordinationScoreMethod:public BaseScoreMethod{
+    public:
+
+    MetalCoordinationScoreMethod(std::string metal_hash_table_path, Size coordination_number, Real cart_resl=0.5,Real angle_resl=15.0);
+    ~MetalCoordinationScoreMethod();
+    virtual Real score(scene::Pose & pose) const override;
+    Real score_with_tokens(scene::Pose & pose, std::vector<Size> & coordination_res, Size & token) const;
+    void unserialize_phmap(std::string const & fname);
+    Size coordination_number() const {return _coordination_number;};
+
+    protected:
+
+    std::string _metal_hash_table_path;
+    Size _coordination_number;
+    hash_table<uint64_t, int32_t> _hash_table;
+    wefoldHasher _hasher;
+
+};
+
+class Rpx1SideScoreMethod:public BaseScoreMethod{
+    public:
+
+    Rpx1SideScoreMethod(std::string rpx_table_path,Real cart_resl=3.5,Real angle_resl=38.0,bool use_ss=false,bool no_chache=false);
+    virtual Real score(scene::Pose & pose) const override;
+    std::vector<Real> score(std::vector<EigenXform> & stubs,scene::Pose & target_pose) const;
+    Real score_rpx_pair(EigenXform const & stub1, EigenXform const & stub2, char aa, char ss1='H', char ss2='H') const;
+    void set_selected_target_res(std::vector<Size> & select_res){_select_target_res = select_res;}
+    void set_target_residue_weight(std::vector<Real> & weight){_res_weight = weight;}
+    void unserialize_phmap(std::string fname);
+
+    protected:
+    std::string _rpx_table_path;
+    hash_table<uint64_t, Real> _rpx_table;
+    wefoldHasher _hasher;
+    std::vector<Size> _select_target_res;
+    std::vector<Real> _res_weight;
+    Real _squared_dist_cutoff;
+    bool _use_ss;
+    bool _no_cache;
+
+};
+
+
+class PreRpx1SideScoreMethod:public BaseScoreMethod{
+    public:
+
+    PreRpx1SideScoreMethod(std::string rpx1side_table_path,Real cart_resl=0.5,Real angle_resl=16.0,bool no_cache=false);
+    virtual Real score(scene::Pose & pose) const override;
+
+    Real score(std::vector<EigenXform> & stubs) const;
+    void unserialize_phmap(std::string fname);
+
+    protected:
+
+    std::string _rpx1side_table_path;
+    hash_table<uint64_t, Real> _rpx1side_table;
+    wefoldHasher _hasher; 
+    bool _no_cache;
+};
+
+class ClashScoreMethod:public BaseScoreMethod{
+    public:
+
+    ClashScoreMethod(Size sequence_separation=5, Real clash_multiplier=5.0,bool scaffold_intra_clash=true,bool scaffold_target_inter_clash=false,Real interface_extra_punish=5.0);
+    virtual Real score(scene::Pose & pose) const override{return base_score(pose);};
+    Real base_score(scene::Pose & pose,Size start_chain=1,Size end_chain=-1) const;
+    void set_CB_swelling_factor(Real v);
+    protected:
+
+    Real _R1R2_pow[5][5];
+    Real _CB_swelling_factor;
+    Size _min_sequence_separation;
+    Real _squared_dist_cutoff;
+    Real _clash_multiplier;
+    Real _interface_extra_punish;
+    bool _scaffold_intra_clash,_scaffold_target_inter_clash;
+
+};
+
+class VoxelClashScoreMethod:public BaseScoreMethod{
+    public:
+    
+    VoxelClashScoreMethod(std::string fname, std::string mode="ALL", Real ball_radius=1.5f, Real grid_resolution = 0.25f,bool no_cache=false,std::string pdb_mode="PROTEIN"):
+    BaseScoreMethod(),_no_cache(no_cache),grid_pose(get_grid_pose(fname,pdb_mode)),_clash_multiplier(30),_is_relative_xform_set(false)
+    {
+        vander_waal_radius = {{ATOM_N,1.54},{ATOM_C,1.70},{ATOM_O,1.52},{ATOM_S,1.8},{ATOM_CA,1.70},{ATOM_CB,1.70},{ATOM_P,1.9}};
+        initialize_voxel_grid(mode,ball_radius,grid_resolution);
+    };
+    VoxelClashScoreMethod(scene::Pose in_pose, std::string mode="ALL", Real ball_radius=1.5f, Real grid_resolution = 0.25f,bool no_cache=false,std::string pdb_mode="PROTEIN"):
+    BaseScoreMethod(),_no_cache(no_cache),grid_pose(in_pose),_clash_multiplier(30),_is_relative_xform_set(false)
+    {
+        vander_waal_radius = {{ATOM_N,1.54},{ATOM_C,1.70},{ATOM_O,1.52},{ATOM_S,1.8},{ATOM_CA,1.70},{ATOM_CB,1.70},{ATOM_P,1.9}};
+        initialize_voxel_grid(mode,ball_radius,grid_resolution);
+    };
+    Pose get_grid_pose(std::string fname, std::string mode);
+    void initialize_voxel_grid(std::string mode, Real ball_radius, Real grid_resolution);
+    virtual Real score(scene::Pose & pose) const override{return score(pose,99999);};
+    bool clash(Vec pos){return _voxel_array->at(pos);}
+    Real score(std::vector<EigenXform> & stubs,Size cutoff) const;
+    Real score(scene::Pose & pose,Size cutoff) const;
+    Real hresl_score(scene::Pose & pose);
+    void visualize_voxel_grid( std::string fname );
+    void set_relative_pos(EigenXform const & xform);
+    protected:
+    std::string _pdb_mode;
+    std::unordered_map<ATOM_TYPE,Real> vander_waal_radius;
+    VoxelArrayOP _voxel_array;
+    VoxelIndicateArrayOP _indicate_array;
+    VoxelArrayOP _indicate_voxel_array;
+    bool _no_cache;
+    Real _clash_multiplier;
+    EigenXform _relative_xform;
+    bool _is_relative_xform_set;
+    scene::Pose grid_pose;
+
+
+};
+
+class RepeatScoreMethod:public BaseScoreMethod{
+    public:
+
+    RepeatScoreMethod(std::pair<Real,Real> radius_control = std::pair<Real,Real>(0,10000),
+                       std::pair<Real,Real> rise_control = std::pair<Real,Real>(0,10000),
+                       std::pair<Real,Real> omega_control = std::pair<Real,Real>(0,10000)):
+        _radius_control(radius_control),
+	_rise_control(rise_control),
+	_omega_control(omega_control),
+	_radius_multiplier(20.0),
+	_rise_multiplier(20.0),
+	_omega_multiplier(2.0){};
+    virtual Real score(scene::Pose & pose) const override;
+    protected:
+
+    std::pair<Real,Real> _radius_control;
+    std::pair<Real,Real> _rise_control;
+    std::pair<Real,Real> _omega_control;
+    // multiplier
+    Real _radius_multiplier;
+    Real _rise_multiplier;
+    Real _omega_multiplier;
+};
+
+
+typedef std::shared_ptr<BaseScoreMethod> ScoreMethodOP;
+
+class ScoreFunction{
+    public:
+    void regist_method(std::string method_name,ScoreMethodOP methodOP){
+        if(_method_map.count(method_name)!=0){
+            std::cout<<"override an exist score method named : "<< method_name << std::endl;
+        }
+        _method_map[method_name] = methodOP;
+    }
+    void delete_method(std::string method_name){
+        if(_method_map.count(method_name)==0){
+            std::cout<<"delete an unexist score method named : "<< method_name << std::endl;
+            std::exit(0);
+        }
+        _method_map.erase(method_name);
+    }
+    ScoreMethodOP get_method(std::string method_name){
+        if(_method_map.count(method_name)==0){
+            std::cout<<"cant find score method :" <<method_name<<std::endl;
+            exit(0);
+        }
+        return _method_map.at(method_name);
+    }
+    std::vector<ScoreMethodOP> get_all_methods () const {
+        std::vector<ScoreMethodOP> all_score_methods;
+        for(auto pair: _method_map){
+            all_score_methods.push_back(pair.second);
+        }
+        return all_score_methods;
+    }
+    Real score(scene::Pose & pose){
+        Real total_score=0;
+        for(auto pair: _method_map){
+            total_score += pair.second->weighted_score(pose);
+        }
+        return total_score;
+    }
+
+    Real score(scene::Pose & pose,std::vector<std::string> exclude_methods){
+        Real total_score=0;
+        for(auto pair: _method_map){
+            if(std::find(exclude_methods.begin(),exclude_methods.end(),pair.first)!=exclude_methods.end())continue;
+            total_score += pair.second->weighted_score(pose);
+        }
+        return total_score;
+    }
+
+
+    private:
+    std::unordered_map<std::string,ScoreMethodOP> _method_map;
+};
+
+}
+
+#endif

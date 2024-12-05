@@ -1,0 +1,7 @@
+add_subdirectory(apps)
+add_subdirectory(scene)
+add_subdirectory(sampling)
+add_subdirectory(scoring)
+add_subdirectory(utils)
+add_subdirectory(basic)
+add_subdirectory(metric)

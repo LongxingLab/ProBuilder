@@ -1,0 +1,5 @@
+project(dssp)
+aux_source_directory(. DIR_DSSP_SRCS)
+list(REMOVE_ITEM DIR_DSSP_SRCS  "./pydssp.cpp" "./mkdssp.cpp")
+add_library(${PROJECT_NAME} STATIC ${DIR_DSSP_SRCS})
+target_link_libraries(${PROJECT_NAME} boost_date_time boost_filesystem boost_iostreams boost_program_options  boost_system boost_thread pthread)
