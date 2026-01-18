@@ -5,6 +5,7 @@
 #include "utils/random_util.hh"
 #include "utils/utils.hh"
 #include "utils/string_util.hh"
+#include "utils/math_util.hh"
 #include "basic/global.hh"
 
 #include <fstream>
@@ -171,6 +172,7 @@ Pose::Pose(std::string pdb_name,char chain ,std::string symmetry,Size repeat_num
         _conformation.update_local_xform_from_global_xform(ii,update_N_CA,update_N_CA,update_C);
     }
     set_root_index(_conformation.center_residue());
+    _freeze_root = true;
     // update_coordinates();
 }
 

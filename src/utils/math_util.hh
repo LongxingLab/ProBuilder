@@ -16,7 +16,11 @@ namespace utils {
 
 using namespace basic;
 
-Real xform_magnitude(EigenXform const & x, Real rg);
+Real get_dihedral(Vec const & a, Vec const & b, Vec const & c, Vec const & d);
+Real get_angle(Vec const & a, Vec const & b, Vec const & c);
+EigenXform xform_from_3points(Vec const & a, Vec const & b, Vec const & c);
+
+Real xform_magnitude(EigenXform const & x, Real lever);
 
 }
 

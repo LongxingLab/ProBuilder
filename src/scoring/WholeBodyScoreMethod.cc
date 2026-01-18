@@ -2,6 +2,7 @@
 #include "scoring/Energy.hh"
 #include "utils/hash_util.hh"
 #include "utils/utils.hh"
+#include "utils/math_util.hh"
 
 #include <gzip/gzstream.hh>
 #include <cmath>
@@ -107,19 +108,6 @@ void MotifPairRelativePosScoreMethod::set_motif_chain(Size motif1_chain_idx, Siz
     _motif1_chain_idx = motif2_chain_idx;
 }
 
-// convert the relative xform into a real number
-Real MotifPairRelativePosScoreMethod::xform_magnitude(
-    EigenXform const & x
-) const {
-    Real err_trans2 = x.translation().squaredNorm();
-    Real cos_theta = (x.rotation().trace()-1.0)/2.0;
-
-    Real err_rot = std::sqrt( std::max( 0.0, 1.0 - cos_theta*cos_theta ) ) * _motif_radius;
-    if( cos_theta < 0 ) err_rot = _motif_radius;
-    Real err = std::sqrt( err_trans2 + err_rot*err_rot );
-    return err;
-}
-
 Real MotifPairRelativePosScoreMethod::score(scene::Pose & pose) const {
 
     EigenXform stub1 = pose.stub(_motif1_insert_pos+_motif1_representative_res_index-1, _motif1_chain_idx); // all 1-index, so minus 1
@@ -127,7 +115,7 @@ Real MotifPairRelativePosScoreMethod::score(scene::Pose & pose) const {
 
     EigenXform cur_relative_xform = stub1.inverse(Eigen::Isometry) * stub2;
 
-    Real dist = xform_magnitude(_inv_relative_xform * cur_relative_xform);
+    Real dist = utils::xform_magnitude(_inv_relative_xform * cur_relative_xform, _motif_radius);
 
     if( dist <= 5 ) {
         return dist;

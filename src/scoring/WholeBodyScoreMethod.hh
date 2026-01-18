@@ -52,7 +52,6 @@ public:
     void load_motif(std::string pdb, Size & rep_res_index, EigenXform & xform);
     void set_motif_insert_pos(Size motif1_insert_pos, Size motif2_insert_pos);
     void set_motif_chain(Size motif1_chain_idx, Size motif2_chain_idx);
-    Real xform_magnitude(EigenXform const & x) const;
 
     virtual Real score(scene::Pose & pose) const override;
 

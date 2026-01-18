@@ -1,6 +1,7 @@
 #include "scoring/ClashScoreMethod.hh"
 #include "scoring/Energy.hh"
 #include "utils/hash_util.hh"
+#include "utils/math_util.hh"
 
 #include <cmath>
 #include <string>

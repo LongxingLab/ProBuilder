@@ -11,7 +11,7 @@
 #include "basic/assert.hh"
 #include "utils/random_util.hh"
 #include "basic/assert.hh"
-#include "utils/dssp.hh"
+#include "utils/dssp_util.hh"
 #include "utils/math_util.hh"
 
 #include "metric/LigandNeighbors.hh"
