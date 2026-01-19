@@ -16,6 +16,13 @@ The `scaffold_generator` can rapidly generate helical protein scaffolds. It take
 ## Other applications
 The usage of other applications is detailed in separate Git repositories. Please refer to the links provided in our papers for more information.
 
+Currently available applications include:
+ - `scaffold_generator`:  protein scaffold generation for a given secondary structure configuration.
+ - `light_homooligomer`: for building noncanonical amino acids regulated protein homooligomers, and we used the light responsive AzoF in our [*Nature Chemistry, 2025*](https://www.nature.com/articles/s41557-025-01929-2) paper.
+ - `light_heterodimer`: for building noncanonical amino acids regulated protein heterodimers, see our [*Nature Chemistry, 2025*](https://www.nature.com/articles/s41557-025-01929-2) paper.
+ - `inducible_homooligomer_generator`: for building protein homooligomers regulated by small molecule ligands with matching symmetry, please refer to our [*Science, 2026*](https://www.science.org/doi/10.1126/science.ady6017) paper.
+ - `covalent_ligand_binder`: for building covalent small molecule binders.
+
 ## Database
 The ProBuilder package requires the fragment database for building new structures and rpx score database for scoring purpose. However, these two databases too large to be deposited on github. You can download them from: [10.5281/zenodo.16492615](https://doi.org/10.5281/zenodo.16492615).
 
